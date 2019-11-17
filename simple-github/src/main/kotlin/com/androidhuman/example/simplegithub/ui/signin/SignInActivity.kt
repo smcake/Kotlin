@@ -3,7 +3,7 @@ package com.androidhuman.example.simplegithub.ui.signin
 import com.androidhuman.example.simplegithub.BuildConfig
 import com.androidhuman.example.simplegithub.R
 import com.androidhuman.example.simplegithub.api.AuthApi
-import com.androidhuman.example.simplegithub.api.GithubApiProvider
+import com.androidhuman.example.simplegithub.api.provideAuthApi
 import com.androidhuman.example.simplegithub.api.model.GithubAccessToken
 import com.androidhuman.example.simplegithub.data.AuthTokenProvider
 import com.androidhuman.example.simplegithub.ui.main.MainActivity
@@ -14,34 +14,27 @@ import android.os.Bundle
 import android.support.customtabs.CustomTabsIntent
 import android.support.v7.app.AppCompatActivity
 import android.view.View
-import android.widget.Button
-import android.widget.ProgressBar
 import android.widget.Toast
 
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
 
+import kotlinx.android.synthetic.main.activity_sign_in.*
+
 class SignInActivity : AppCompatActivity() {
 
-    internal lateinit var btnStart: Button
+    internal val api by lazy { provideAuthApi()}
 
-    internal lateinit var progress: ProgressBar
+    internal val authTokenProvider  by lazy { AuthTokenProvider(this) }
 
-    internal lateinit var api: AuthApi
-
-    internal lateinit var authTokenProvider: AuthTokenProvider
-
-    internal lateinit var accessTokenCall: Call<GithubAccessToken>
+    internal var accessTokenCall: Call<GithubAccessToken>? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_sign_in)
 
-        btnStart = findViewById(R.id.btnActivitySignInStart)
-        progress = findViewById(R.id.pbActivitySignIn)
-
-        btnStart.setOnClickListener {
+        btnActivitySignInStart.setOnClickListener {
             val authUri = Uri.Builder().scheme("https").authority("github.com")
                     .appendPath("login")
                     .appendPath("oauth")
@@ -52,9 +45,6 @@ class SignInActivity : AppCompatActivity() {
             val intent = CustomTabsIntent.Builder().build()
             intent.launchUrl(this@SignInActivity, authUri)
         }
-
-        api = GithubApiProvider.provideAuthApi()
-        authTokenProvider = AuthTokenProvider(this)
 
         if (null != authTokenProvider.token) {
             launchMainActivity()
@@ -79,7 +69,7 @@ class SignInActivity : AppCompatActivity() {
         accessTokenCall = api.getAccessToken(
                 BuildConfig.GITHUB_CLIENT_ID, BuildConfig.GITHUB_CLIENT_SECRET, code)
 
-        accessTokenCall.enqueue(object : Callback<GithubAccessToken> {
+        accessTokenCall!!.enqueue(object : Callback<GithubAccessToken> {
             override fun onResponse(call: Call<GithubAccessToken>,
                                     response: Response<GithubAccessToken>) {
                 hideProgress()
@@ -102,14 +92,20 @@ class SignInActivity : AppCompatActivity() {
         })
     }
 
+    override fun onStop() {
+        super.onStop()
+
+        accessTokenCall?.run { cancel() }
+    }
+
     private fun showProgress() {
-        btnStart.visibility = View.GONE
-        progress.visibility = View.VISIBLE
+        btnActivitySignInStart.visibility = View.GONE
+        pbActivitySignIn.visibility = View.VISIBLE
     }
 
     private fun hideProgress() {
-        btnStart.visibility = View.VISIBLE
-        progress.visibility = View.GONE
+        btnActivitySignInStart.visibility = View.VISIBLE
+        pbActivitySignIn.visibility = View.GONE
     }
 
     private fun showError(throwable: Throwable) {
